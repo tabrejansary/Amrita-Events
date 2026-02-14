@@ -23,7 +23,7 @@ const { protect, authorize } = require('../middleware/auth');
 const router = express.Router();
 
 // Configure multer for file uploads
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ dest: '/tmp' });
 
 // Dashboard section routes
 router.get('/trending', protect, getTrendingEvents);

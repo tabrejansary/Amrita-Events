@@ -17,7 +17,7 @@ const { protect } = require('../middleware/auth');
 const router = express.Router();
 
 // Configure multer for file uploads
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ dest: '/tmp' });
 
 router.post('/register', upload.single('image'), register);
 router.post('/login', login);
