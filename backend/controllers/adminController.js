@@ -18,6 +18,7 @@ exports.getPendingEvents = async (req, res) => {
         const events = await Event.find({ status: 'pending' })
             .sort({ createdAt: -1 })
             .populate('organizer', 'name email clubName role')
+            .populate('customForm')
             .skip(skip)
             .limit(limit);
 
@@ -580,6 +581,7 @@ exports.getAllEvents = async (req, res) => {
         const events = await Event.find(query)
             .sort({ createdAt: -1 })
             .populate('organizer', 'name email clubName role')
+            .populate('customForm')
             .skip(skip)
             .limit(limit);
 

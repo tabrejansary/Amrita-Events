@@ -80,11 +80,16 @@ exports.getEventRegistrations = async (req, res) => {
             });
         }
 
-        // Privacy check: Only the organizer of this event or an admin can see registrations
-        if (event.organizer.toString() !== req.user.id && req.user.role !== 'admin') {
+        // Privacy check: 
+        // 1. Any Admin can see registrations for "Admin" (Special) events.
+        // 2. Clubs can ONLY see registrations for events they personally created.
+        const isAdminViewingSpecialEvent = req.user.role === 'admin' && (event.organizerName === 'Admin' || (event.organizer && event.organizer.role === 'admin'));
+        const isOwner = event.organizer.toString() === req.user.id;
+
+        if (!isOwner && !isAdminViewingSpecialEvent) {
             return res.status(403).json({
                 success: false,
-                message: 'Not authorized to view registrations for this event'
+                message: 'Not authorized to view registrations for this event. Admin can only view special event registrations.'
             });
         }
 

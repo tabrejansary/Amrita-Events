@@ -7,7 +7,7 @@ Updated the Amrita Pulse platform to accept actual Amrita Bengaluru email format
 ### Supported Email Formats
 
 1. **Students/BCA:** `@bl.students.amrita.edu`
-   - Example: `bl.sc.u4cse24063@bl.students.amrita.edu`
+   - Example: `bl.sc.u4cse24070@bl.students.amrita.edu`
 
 2. **Faculty/Staff:** `@blr.amrita.edu`
    - Example: `sa@blr.amrita.edu`

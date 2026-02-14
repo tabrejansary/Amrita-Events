@@ -573,11 +573,11 @@ function AdminEventItem({ event, currentUserId, handleToggleFeature, handleDelet
                             <span className="text-[11px]">{event.isFeatured ? 'Featured' : 'Feature'}</span>
                         </button>
 
-                        {(event.organizer && currentUserId === (typeof event.organizer === 'object' ? event.organizer._id : event.organizer)) && (
+                        {((event.organizer && currentUserId === (typeof event.organizer === 'object' ? event.organizer._id : event.organizer)) || event.organizerName === 'Admin') && (
                             <Link
                                 href={`/events/${event._id}/edit`}
                                 className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition flex items-center justify-center"
-                                title="Edit your event"
+                                title="Edit special event"
                             >
                                 <FaEdit size={12} />
                             </Link>
@@ -595,7 +595,7 @@ function AdminEventItem({ event, currentUserId, handleToggleFeature, handleDelet
                 </button>
 
                 {/* Only show registrations link to the actual organizer. Admins who are not organizers shouldn't see student data. */}
-                {((event.organizer && currentUserId === (typeof event.organizer === 'object' ? event.organizer._id : event.organizer)) &&
+                {(((event.organizer && currentUserId === (typeof event.organizer === 'object' ? event.organizer._id : event.organizer)) || event.organizerName === 'Admin') &&
                     (!event.registrationLink || event.useInternalRegistration || (event.registrations > 0))) && (
                         <Link
                             href={`/club/registrations/${event._id}`}

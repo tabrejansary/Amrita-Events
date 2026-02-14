@@ -49,12 +49,18 @@ export default function RegistrationDetailsPage() {
 
             const eventData = eventRes.data.data;
 
-            // SECURITY CHECK: Verify if the current user is the organizer of this event
-            const organizerId = typeof eventData.organizer === 'object'
-                ? (eventData.organizer._id || eventData.organizer.id)
-                : eventData.organizer;
+            // SECURITY CHECK: 
+            // 1. Any Admin can see registrations for "Admin" (Special) events.
+            // 2. Clubs can ONLY see registrations for events they personally created.
+            const isAdminViewingSpecialEvent = user.role === 'admin' && (eventData.organizerName?.toLowerCase() === 'admin');
 
-            if (user._id !== organizerId && user.id !== organizerId) {
+            const organizerId = eventData.organizer
+                ? (typeof eventData.organizer === 'object' ? (eventData.organizer._id || eventData.organizer.id) : eventData.organizer)
+                : null;
+
+            const isOwner = (user._id === organizerId || user.id === organizerId);
+
+            if (!isOwner && !isAdminViewingSpecialEvent) {
                 console.error('Unauthorized access attempt to registration details');
                 // Redirect based on role
                 if (user.role === 'admin') router.push('/admin/events');
@@ -66,10 +72,15 @@ export default function RegistrationDetailsPage() {
             setEvent(eventData);
             setRegistrations(regRes.data.data);
 
+            // Use populated customForm if available, otherwise fetch it
             if (eventData.customForm) {
-                const formId = typeof eventData.customForm === 'string' ? eventData.customForm : eventData.customForm._id;
-                const formRes = await formAPI.getFormById(formId);
-                setForm(formRes.data.data);
+                if (typeof eventData.customForm === 'object' && eventData.customForm.fields) {
+                    setForm(eventData.customForm);
+                } else {
+                    const formId = typeof eventData.customForm === 'string' ? eventData.customForm : (eventData.customForm._id || eventData.customForm.id);
+                    const formRes = await formAPI.getFormById(formId);
+                    setForm(formRes.data.data);
+                }
             }
         } catch (error) {
             console.error('Failed to fetch registration data:', error);

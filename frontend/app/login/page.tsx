@@ -139,7 +139,7 @@ export default function LoginPage() {
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amrita-maroon"
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                placeholder="bl.sc.u4cse24063@bl.students.amrita.edu"
+                                placeholder="bl.sc.u4cse24070@bl.students.amrita.edu"
                             />
                             <p className="text-xs text-amrita-textGray mt-1">
                                 Students: @bl.students.amrita.edu | Faculty: @blr.amrita.edu

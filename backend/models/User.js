@@ -16,7 +16,7 @@ const UserSchema = new mongoose.Schema({
         validate: {
             validator: function (email) {
                 // Accept Amrita Bengaluru email formats:
-                // Students/BCA: *@bl.students.amrita.edu (e.g., bl.sc.u4cse24063@bl.students.amrita.edu)
+                // Students/BCA: *@bl.students.amrita.edu (e.g., bl.sc.u4cse24070@bl.students.amrita.edu)
                 // Faculty/Staff: *@blr.amrita.edu (e.g., sa@blr.amrita.edu)
                 // Generic: *@amrita.edu (for other campuses or admin accounts)
                 return email.endsWith('@bl.students.amrita.edu') ||

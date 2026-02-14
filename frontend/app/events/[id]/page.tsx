@@ -208,14 +208,18 @@ export default function EventDetailPage() {
                                 <span className="bg-amrita-maroon/5 text-amrita-maroon text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
                                     {event.category}
                                 </span>
-                                {(event.organizer && user?._id === (typeof event.organizer === 'object' ? event.organizer._id : event.organizer)) && (
-                                    <button
-                                        onClick={() => router.push(`/events/${event._id}/edit`)}
-                                        className="flex items-center gap-2 text-amrita-maroon hover:bg-amrita-maroon/5 text-xs px-3 py-1.5 rounded-lg border border-amrita-maroon/30 transition font-bold"
-                                    >
-                                        <FaEdit size={12} /> <span>Edit</span>
-                                    </button>
-                                )}
+                                {(event.organizer && (
+                                    user?._id === (typeof event.organizer === 'object' ? event.organizer._id : event.organizer) ||
+                                    user?.id === (typeof event.organizer === 'object' ? event.organizer.id : event.organizer) ||
+                                    (user?.role === 'admin' && event.organizerName?.toLowerCase() === 'admin')
+                                )) && (
+                                        <button
+                                            onClick={() => router.push(`/events/${event._id}/edit`)}
+                                            className="flex items-center gap-2 text-amrita-maroon hover:bg-amrita-maroon/5 text-xs px-3 py-1.5 rounded-lg border border-amrita-maroon/30 transition font-bold"
+                                        >
+                                            <FaEdit size={12} /> <span>Edit</span>
+                                        </button>
+                                    )}
                             </div>
                         </div>
 
@@ -328,7 +332,7 @@ export default function EventDetailPage() {
                                 </div>
                             ) : (
                                 <div className="w-full">
-                                    {isRegistered || user?.role === 'admin' ? (
+                                    {user?.role !== 'student' || isRegistered ? (
                                         <div className="flex flex-col sm:flex-row gap-3">
                                             {isRegistered && (
                                                 <div className="flex-1 bg-green-50 border border-green-200 text-green-700 p-2.5 rounded-lg flex items-center justify-center space-x-2 text-sm font-bold">

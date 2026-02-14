@@ -45,6 +45,7 @@ exports.getEvents = async (req, res) => {
         const events = await Event.find(query)
             .sort({ isFeatured: -1, eventDate: 1 })
             .populate('organizer', 'name email clubName')
+            .populate('customForm')
             .skip(skip)
             .limit(limit);
 
@@ -96,6 +97,7 @@ exports.getUpcomingEvents = async (req, res) => {
         const events = await Event.find(query)
             .sort({ eventDate: 1 })
             .populate('organizer', 'name email clubName')
+            .populate('customForm')
             .skip(skip)
             .limit(limit);
 
@@ -491,7 +493,9 @@ exports.toggleBookmark = async (req, res) => {
 // @access  Private
 exports.getEvent = async (req, res) => {
     try {
-        const event = await Event.findById(req.params.id).populate('organizer', 'name email clubName');
+        const event = await Event.findById(req.params.id)
+            .populate('organizer', 'name email clubName')
+            .populate('customForm');
 
         if (!event) {
             return res.status(404).json({
@@ -546,6 +550,7 @@ exports.createEvent = async (req, res) => {
             venue,
             eventDate,
             eventTime,
+            registrationLink,
             isOnline,
             contacts,
             useInternalRegistration,
@@ -650,8 +655,11 @@ exports.updateEvent = async (req, res) => {
             });
         }
 
-        // Check ownership - Strictly restrict to owner only
-        if (event.organizer.toString() !== req.user.id) {
+        // Check ownership & permissions
+        const isOwner = event.organizer.toString() === req.user.id;
+        const isAdminEditingSpecialEvent = req.user.role === 'admin' && event.organizerName === 'Admin';
+
+        if (!isOwner && !isAdminEditingSpecialEvent) {
             return res.status(403).json({
                 success: false,
                 message: 'Not authorized to update this event. Only the original organizer can edit this.',
@@ -727,7 +735,7 @@ exports.updateEvent = async (req, res) => {
         event = await Event.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true,
-        });
+        }).populate('organizer', 'name email clubName').populate('customForm');
 
         res.status(200).json({
             success: true,
@@ -755,8 +763,11 @@ exports.deleteEvent = async (req, res) => {
             });
         }
 
-        // Check ownership - Strictly restrict to owner only
-        if (event.organizer.toString() !== req.user.id) {
+        // Check ownership & permissions
+        const isOwner = event.organizer.toString() === req.user.id;
+        const isAdminEditingSpecialEvent = req.user.role === 'admin' && event.organizerName === 'Admin';
+
+        if (!isOwner && !isAdminEditingSpecialEvent) {
             return res.status(403).json({
                 success: false,
                 message: 'Not authorized to delete this event. Only the original organizer can delete this.',

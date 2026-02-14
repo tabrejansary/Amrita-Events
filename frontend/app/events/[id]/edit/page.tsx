@@ -78,13 +78,19 @@ export default function EditEventPage() {
             const response = await eventAPI.getEvent(params.id as string);
             const event = response.data.data;
 
-            // Strict ownership check
+            // Security check: 
+            // 1. Any Admin can edit "Admin" (Special) events.
+            // 2. Clubs can ONLY edit events they personally created.
+            const isAdminEditingSpecialEvent = currentUser.role === 'admin' && event.organizerName === 'Admin';
+
             let organizerId = null;
             if (event.organizer) {
                 organizerId = typeof event.organizer === 'object' ? event.organizer._id : event.organizer;
             }
 
-            if (!organizerId || organizerId !== currentUser._id) {
+            const isOwner = organizerId === currentUser._id;
+
+            if (!isOwner && !isAdminEditingSpecialEvent) {
                 alert('You are not authorized to edit this event.');
                 router.push(`/events/${event._id}`);
                 return;
@@ -108,15 +114,20 @@ export default function EditEventPage() {
             if (event.useInternalRegistration) {
                 setUseInternalRegistration(true);
                 if (event.customForm) {
-                    const formId = typeof event.customForm === 'object' ? event.customForm._id : event.customForm;
-                    setExistingFormId(formId);
-                    try {
-                        const formRes = await formAPI.getFormById(formId);
-                        if (formRes.data.success) {
-                            setCustomFormFields(formRes.data.data.fields);
+                    if (typeof event.customForm === 'object' && event.customForm.fields) {
+                        setExistingFormId(event.customForm._id || event.customForm.id);
+                        setCustomFormFields(event.customForm.fields);
+                    } else {
+                        const formId = typeof event.customForm === 'string' ? event.customForm : (event.customForm._id || event.customForm.id);
+                        setExistingFormId(formId);
+                        try {
+                            const formRes = await formAPI.getFormById(formId);
+                            if (formRes.data.success) {
+                                setCustomFormFields(formRes.data.data.fields);
+                            }
+                        } catch (err) {
+                            console.error('Failed to fetch custom form fields');
                         }
-                    } catch (err) {
-                        console.error('Failed to fetch custom form fields');
                     }
                 }
             }

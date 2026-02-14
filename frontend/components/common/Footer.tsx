@@ -14,8 +14,8 @@ export default function Footer() {
         return (
             <footer className="bg-amrita-bgLight border-t border-gray-200 mt-8">
                 <div className="container mx-auto px-4 py-6">
-                    <div className="grid md:grid-cols-3 gap-8 mb-8">
-                        <div>
+                    <div className="grid md:grid-cols-3 gap-8 mb-8 text-center md:text-left">
+                        <div className="flex flex-col items-center md:items-start">
                             <h3 className="text-lg font-bold text-amrita-maroon mb-3">Amrita Events</h3>
                             <p className="text-amrita-textGray text-sm">
                                 All Events, One Place. Your one-stop platform for all campus events at Amrita Vishwa
@@ -23,18 +23,18 @@ export default function Footer() {
                             </p>
                         </div>
 
-                        <div>
+                        <div className="flex flex-col items-center md:items-start">
                             <h4 className="font-semibold text-amrita-textDark mb-3">Quick Links</h4>
-                            <ul className="space-y-2 text-sm text-amrita-textGray">
+                            <ul className="space-y-2 text-sm text-amrita-textGray flex flex-col items-center md:items-start">
                                 <li><a href="/about" className="hover:text-amrita-maroon transition">About</a></li>
                                 <li><a href="/contact" className="hover:text-amrita-maroon transition">Contact</a></li>
                                 <li><a href="/guidelines" className="hover:text-amrita-maroon transition">Event Guidelines</a></li>
                             </ul>
                         </div>
 
-                        <div>
+                        <div className="flex flex-col items-center md:items-start">
                             <h4 className="font-semibold text-amrita-textDark mb-3">Campus</h4>
-                            <p className="text-sm text-amrita-textGray">
+                            <p className="text-sm text-amrita-textGray text-center md:text-left">
                                 Amrita Vishwa Vidyapeetham<br />
                                 Bengaluru Campus<br />
                                 Karnataka, India
