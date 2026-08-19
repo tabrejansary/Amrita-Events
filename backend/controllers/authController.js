@@ -10,7 +10,7 @@ const fs = require('fs');
 // @access  Public
 exports.register = async (req, res) => {
     try {
-        const { name, email, password, role, department, year, interests, clubName } = req.body;
+        const { name, email, password, role, department, year, interests } = req.body;
 
         // Check if user already exists
         const userExists = await User.findOne({ email });
@@ -21,15 +21,16 @@ exports.register = async (req, res) => {
             });
         }
 
-        // Validate Amrita email formats
+        // Validate Amrita email formats (or @gmail.com for dev testing)
         const isValidAmritaEmail = email.endsWith('@bl.students.amrita.edu') ||
             email.endsWith('@blr.amrita.edu') ||
-            email.endsWith('@amrita.edu');
+            email.endsWith('@amrita.edu') ||
+            email.endsWith('@gmail.com');
 
         if (!isValidAmritaEmail) {
             return res.status(400).json({
                 success: false,
-                message: 'Only Amrita email addresses are allowed (@bl.students.amrita.edu or @blr.amrita.edu)',
+                message: 'Only Amrita or Gmail email addresses are allowed',
             });
         }
 
@@ -79,13 +80,8 @@ exports.register = async (req, res) => {
         }
 
         if (userData.role === 'club') {
-            if (!clubName) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Club organizers must provide a club name',
-                });
-            }
-            userData.clubName = clubName;
+            // Club users don't need clubName at registration.
+            // They create or join a club separately via /api/clubs/create or /api/clubs/join
         }
 
         // Handle image upload
@@ -95,13 +91,7 @@ exports.register = async (req, res) => {
                     folder: 'amrita-events/profiles',
                     use_filename: true,
                 });
-
-                if (userData.role === 'club') {
-                    userData.clubLogo = result.secure_url;
-                } else {
-                    userData.profileImage = result.secure_url;
-                }
-
+                userData.profileImage = result.secure_url;
                 // Delete local file
                 fs.unlinkSync(req.file.path);
             } catch (err) {
@@ -147,14 +137,14 @@ exports.register = async (req, res) => {
 
             res.status(201).json({
                 success: true,
-                message: 'Registration successful! Please check your email to verify your account.',
+                message: 'Registration successful! Please check your email to verify your account.' +
+                    (userData.role === 'club' ? ' After verifying, create or join a club to start posting events.' : ''),
                 data: {
                     _id: user._id,
                     name: user.name,
                     email: user.email,
                     role: user.role,
                     profileImage: user.profileImage,
-                    clubLogo: user.clubLogo,
                 },
             });
         } catch (err) {
@@ -168,7 +158,6 @@ exports.register = async (req, res) => {
                     email: user.email,
                     role: user.role,
                     profileImage: user.profileImage,
-                    clubLogo: user.clubLogo,
                 },
             });
         }
@@ -275,7 +264,7 @@ exports.login = async (req, res) => {
         }
 
         // Check for user (include password for comparison)
-        const user = await User.findOne({ email }).select('+password');
+        const user = await User.findOne({ email }).select('+password').populate('club', 'name logo inviteCode');
 
         if (!user) {
             return res.status(401).json({
@@ -315,9 +304,8 @@ exports.login = async (req, res) => {
                 department: user.department,
                 year: user.year,
                 interests: user.interests,
-                clubName: user.clubName,
+                club: user.club || null,
                 profileImage: user.profileImage,
-                clubLogo: user.clubLogo,
                 savedEvents: user.savedEvents || [],
                 registeredEvents: user.registeredEvents || [],
             },
@@ -336,7 +324,7 @@ exports.login = async (req, res) => {
 // @access  Private
 exports.getMe = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id);
+        const user = await User.findById(req.user.id).populate('club', '_id name logo description inviteCode owner');
 
         // Ensure arrays exist in the response
         const userData = user.toObject();
@@ -460,10 +448,6 @@ exports.updateProfile = async (req, res) => {
             }
         }
 
-        if (user.role === 'club') {
-            if (clubName) user.clubName = clubName;
-        }
-
         // Handle image update
         if (req.file) {
             try {
@@ -472,11 +456,7 @@ exports.updateProfile = async (req, res) => {
                     use_filename: true,
                 });
 
-                if (user.role === 'club') {
-                    user.clubLogo = result.secure_url;
-                } else {
-                    user.profileImage = result.secure_url;
-                }
+                user.profileImage = result.secure_url;
 
                 // Delete local file
                 fs.unlinkSync(req.file.path);

@@ -21,9 +21,10 @@ const UserSchema = new mongoose.Schema({
                 // Generic: *@amrita.edu (for other campuses or admin accounts)
                 return email.endsWith('@bl.students.amrita.edu') ||
                     email.endsWith('@blr.amrita.edu') ||
-                    email.endsWith('@amrita.edu');
+                    email.endsWith('@amrita.edu') ||
+                    email.endsWith('@gmail.com');
             },
-            message: 'Only Amrita email addresses are allowed (@bl.students.amrita.edu, @blr.amrita.edu, or @amrita.edu)'
+            message: 'Only Amrita or Gmail email addresses are allowed for testing'
         }
     },
     password: {
@@ -82,16 +83,11 @@ const UserSchema = new mongoose.Schema({
         default: true,
     },
 
-    // Club-specific fields
-    clubName: {
-        type: String,
-        required: function () {
-            return this.role === 'club';
-        }
-    },
-    clubLogo: {
-        type: String, // Cloudinary URL
-        default: '',
+    // Reference to the Club this user belongs to (for club role users)
+    club: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Club',
+        default: null,
     },
 
     // Saved/bookmarked events

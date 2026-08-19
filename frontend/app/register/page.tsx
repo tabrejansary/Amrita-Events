@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authAPI } from '@/lib/api';
-import { CATEGORIES, DEPARTMENTS, YEARS } from '@/lib/constants';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import Footer from '@/components/common/Footer';
 
@@ -41,7 +40,6 @@ export default function RegisterPage() {
         department: '',
         year: 1,
         interests: [] as string[],
-        clubName: '',
         image: null as File | null,
     });
     const [error, setError] = useState('');
@@ -56,22 +54,38 @@ export default function RegisterPage() {
         }));
     };
 
-    const handleNext = () => {
-        // Validation
-        if (step === 1) {
-            const isValidEmail = formData.email.endsWith('@bl.students.amrita.edu') ||
-                formData.email.endsWith('@blr.amrita.edu') ||
-                formData.email.endsWith('@amrita.edu');
+    const validateStep1 = () => {
+        const isValidEmail = formData.email.endsWith('@bl.students.amrita.edu') ||
+            formData.email.endsWith('@blr.amrita.edu') ||
+            formData.email.endsWith('@amrita.edu') ||
+            formData.email.endsWith('@gmail.com');
 
-            if (!isValidEmail) {
-                setError('Please use your Amrita email address (@bl.students.amrita.edu or @blr.amrita.edu)');
+        if (!isValidEmail) {
+            setError('Please use your Amrita email address (@bl.students.amrita.edu, @blr.amrita.edu, or @gmail.com for testing)');
+            return false;
+        }
+
+        const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+        if (!passwordRegex.test(formData.password)) {
+            setError('Password must be at least 8 characters and contain at least 1 letter, 1 number, and 1 special character');
+            return false;
+        }
+
+        setError('');
+        return true;
+    };
+
+    const handleNext = () => {
+        if (!validateStep1()) return;
+
+        if (step === 1) {
+            if (formData.role === 'club') {
+                // Submit directly for club users
+                handleRegisterSubmit();
                 return;
             }
-            const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
-            if (!passwordRegex.test(formData.password)) {
-                setError('Password must be at least 8 characters and contain at least 1 letter, 1 number, and 1 special character');
-                return;
-            }
+            setStep(2);
+            return;
         }
 
         if (step === 2 && formData.role === 'student') {
@@ -79,22 +93,12 @@ export default function RegisterPage() {
                 setError('Please select department and year');
                 return;
             }
+            setError('');
+            setStep(3);
         }
-
-        if (step === 2 && formData.role === 'club') {
-            if (!formData.clubName) {
-                setError('Please enter your club name');
-                return;
-            }
-        }
-
-        setError('');
-        setStep(step + 1);
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
+    const handleRegisterSubmit = async () => {
         if (formData.role === 'student' && formData.interests.length === 0) {
             setError('Please select at least one interest');
             return;
@@ -114,8 +118,6 @@ export default function RegisterPage() {
                 data.append('department', formData.department);
                 data.append('year', formData.year.toString());
                 data.append('interests', JSON.stringify(formData.interests));
-            } else {
-                data.append('clubName', formData.clubName);
             }
 
             if (formData.image) {
@@ -130,6 +132,11 @@ export default function RegisterPage() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await handleRegisterSubmit();
     };
 
     return (
@@ -149,29 +156,31 @@ export default function RegisterPage() {
                     <p className="text-amrita-textGray">Create your account to get started</p>
                 </div>
 
-                {/* Progress Steps */}
-                <div className="flex justify-center mb-8">
-                    <div className="flex items-center space-x-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 1 ? 'bg-amrita-maroon text-white' : 'bg-gray-200 text-gray-600'
-                            }`}>
-                            1
-                        </div>
-                        <div className={`w-16 h-1 ${step >= 2 ? 'bg-amrita-maroon' : 'bg-gray-200'}`}></div>
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 2 ? 'bg-amrita-maroon text-white' : 'bg-gray-200 text-gray-600'
-                            }`}>
-                            2
-                        </div>
-                        <div className={`w-16 h-1 ${step >= 3 ? 'bg-amrita-maroon' : 'bg-gray-200'}`}></div>
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 3 ? 'bg-amrita-maroon text-white' : 'bg-gray-200 text-gray-600'
-                            }`}>
-                            3
+                {/* Progress Steps (shown for student flow) */}
+                {formData.role === 'student' && step < 4 && (
+                    <div className="flex justify-center mb-8">
+                        <div className="flex items-center space-x-4">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 1 ? 'bg-amrita-maroon text-white' : 'bg-gray-200 text-gray-600'
+                                }`}>
+                                1
+                            </div>
+                            <div className={`w-16 h-1 ${step >= 2 ? 'bg-amrita-maroon' : 'bg-gray-200'}`}></div>
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 2 ? 'bg-amrita-maroon text-white' : 'bg-gray-200 text-gray-600'
+                                }`}>
+                                2
+                            </div>
+                            <div className={`w-16 h-1 ${step >= 3 ? 'bg-amrita-maroon' : 'bg-gray-200'}`}></div>
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 3 ? 'bg-amrita-maroon text-white' : 'bg-gray-200 text-gray-600'
+                                }`}>
+                                3
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 <div className="card">
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
                             {error}
                         </div>
                     )}
@@ -179,7 +188,7 @@ export default function RegisterPage() {
                     {/* Step 1: Basic Info */}
                     {step === 1 && (
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-amrita-textDark">Basic Information</h2>
+                            <h2 className="text-2xl font-bold text-amrita-textDark">Account Information</h2>
 
                             <div>
                                 <label className="block text-sm font-semibold text-amrita-textDark mb-2">
@@ -208,7 +217,7 @@ export default function RegisterPage() {
                                     placeholder="bl.sc.u4cse24070@bl.students.amrita.edu"
                                 />
                                 <p className="text-xs text-amrita-textGray mt-1">
-                                    Students: @bl.students.amrita.edu | Faculty: @blr.amrita.edu
+                                    @bl.students.amrita.edu | @blr.amrita.edu | @amrita.edu | @gmail.com (for testing)
                                 </p>
                             </div>
 
@@ -231,125 +240,102 @@ export default function RegisterPage() {
 
                             <div>
                                 <label className="block text-sm font-semibold text-amrita-textDark mb-2">
-                                    I am a
+                                    I am registering as:
                                 </label>
                                 <select
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amrita-maroon"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amrita-maroon font-semibold"
                                     value={formData.role}
                                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                 >
                                     <option value="student">Student</option>
-                                    <option value="club">Club Organizer</option>
+                                    <option value="club">Club Organizer (Create or Join a Club)</option>
                                 </select>
                             </div>
 
-                            <button onClick={handleNext} className="w-full btn-primary py-3">
-                                Next
+                            {formData.role === 'club' && (
+                                <div className="p-3 bg-amrita-maroon/5 rounded-lg border border-amrita-maroon/20">
+                                    <p className="text-xs text-amrita-maroon font-medium leading-relaxed">
+                                        💡 You will be able to create your club or join your team with an invite code right after logging in.
+                                    </p>
+                                </div>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={handleNext}
+                                disabled={loading || !formData.name || !formData.email || !formData.password}
+                                className="w-full btn-primary py-3 font-bold disabled:opacity-50"
+                            >
+                                {formData.role === 'club' ? (loading ? 'Creating Account...' : 'Register as Club Organizer') : 'Next: Academic Info'}
                             </button>
                         </div>
                     )}
 
-                    {/* Step 2: Role-Specific Info */}
-                    {step === 2 && (
+                    {/* Step 2: Student Academic Info */}
+                    {step === 2 && formData.role === 'student' && (
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold text-amrita-textDark">
-                                {formData.role === 'student' ? 'Academic Information' : 'Club Information'}
-                            </h2>
+                            <h2 className="text-2xl font-bold text-amrita-textDark">Academic Information</h2>
 
-                            {formData.role === 'student' && (
-                                <>
-                                    <div>
-                                        <label className="block text-sm font-semibold text-amrita-textDark mb-2">
-                                            Department
-                                        </label>
-                                        <select
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amrita-maroon"
-                                            value={formData.department}
-                                            onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                                        >
-                                            <option value="">Select Department</option>
-                                            {settings.departments.filter(d => d !== 'All' && d !== 'Other').map(dept => (
-                                                <option key={dept} value={dept}>{dept}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-amrita-textDark mb-2">
+                                    Department
+                                </label>
+                                <select
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amrita-maroon"
+                                    value={formData.department}
+                                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                                >
+                                    <option value="">Select Department</option>
+                                    {settings.departments.filter(d => d !== 'All' && d !== 'Other').map(dept => (
+                                        <option key={dept} value={dept}>{dept}</option>
+                                    ))}
+                                </select>
+                            </div>
 
-                                    <div>
-                                        <label className="block text-sm font-semibold text-amrita-textDark mb-2">
-                                            Year
-                                        </label>
-                                        <select
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amrita-maroon"
-                                            value={formData.year}
-                                            onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
-                                        >
-                                            {settings.years.map(year => (
-                                                <option key={year} value={year}>Year {year}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-amrita-textDark mb-2">
+                                    Year
+                                </label>
+                                <select
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amrita-maroon"
+                                    value={formData.year}
+                                    onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
+                                >
+                                    {settings.years.map(year => (
+                                        <option key={year} value={year}>Year {year}</option>
+                                    ))}
+                                </select>
+                            </div>
 
-                                    <div>
-                                        <label className="block text-sm font-semibold text-amrita-textDark mb-2">
-                                            Profile Picture (Optional)
-                                        </label>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amrita-maroon file:text-white hover:file:bg-amrita-maroon/90"
-                                            onChange={(e) => setFormData({ ...formData, image: e.target.files?.[0] || null })}
-                                        />
-                                    </div>
-                                </>
-                            )}
-
-                            {formData.role === 'club' && (
-                                <>
-                                    <div>
-                                        <label className="block text-sm font-semibold text-amrita-textDark mb-2">
-                                            Club Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            required
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amrita-maroon"
-                                            value={formData.clubName}
-                                            onChange={(e) => setFormData({ ...formData, clubName: e.target.value })}
-                                            placeholder="e.g., Tech Club, Cultural Committee"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-semibold text-amrita-textDark mb-2">
-                                            Club Logo (Optional)
-                                        </label>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amrita-maroon file:text-white hover:file:bg-amrita-maroon/90"
-                                            onChange={(e) => setFormData({ ...formData, image: e.target.files?.[0] || null })}
-                                        />
-                                    </div>
-                                </>
-                            )}
+                            <div>
+                                <label className="block text-sm font-semibold text-amrita-textDark mb-2">
+                                    Profile Picture (Optional)
+                                </label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amrita-maroon file:text-white hover:file:bg-amrita-maroon/90"
+                                    onChange={(e) => setFormData({ ...formData, image: e.target.files?.[0] || null })}
+                                />
+                            </div>
 
                             <div className="flex space-x-4">
                                 <button onClick={() => setStep(1)} className="flex-1 btn-secondary py-3">
                                     Back
                                 </button>
-                                <button onClick={handleNext} className="flex-1 btn-primary py-3">
-                                    Next
+                                <button onClick={handleNext} className="flex-1 btn-primary py-3 font-bold">
+                                    Next: Select Interests
                                 </button>
                             </div>
                         </div>
                     )}
 
-                    {/* Step 3: Interests (Students Only) */}
+                    {/* Step 3: Student Interests */}
                     {step === 3 && formData.role === 'student' && (
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <h2 className="text-2xl font-bold text-amrita-textDark">Select Your Interests</h2>
                             <p className="text-amrita-textGray">
-                                Choose at least one category. You'll only see events matching your interests.
+                                Choose at least one category to personalize your campus event feed.
                             </p>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -375,36 +361,7 @@ export default function RegisterPage() {
                                 <button
                                     type="submit"
                                     disabled={loading || formData.interests.length === 0}
-                                    className="flex-1 btn-primary py-3 disabled:opacity-50"
-                                >
-                                    {loading ? 'Creating Account...' : 'Complete Registration'}
-                                </button>
-                            </div>
-                        </form>
-                    )}
-
-                    {/* Step 3: Complete Registration (Club) */}
-                    {step === 3 && formData.role === 'club' && (
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <h2 className="text-2xl font-bold text-amrita-textDark">Complete Registration</h2>
-                            <p className="text-amrita-textGray">
-                                Review your information and complete your registration.
-                            </p>
-
-                            <div className="bg-amrita-bgLight p-4 rounded-lg space-y-2 text-sm">
-                                <p><strong>Name:</strong> {formData.name}</p>
-                                <p><strong>Email:</strong> {formData.email}</p>
-                                <p><strong>Club:</strong> {formData.clubName}</p>
-                            </div>
-
-                            <div className="flex space-x-4">
-                                <button type="button" onClick={() => setStep(2)} className="flex-1 btn-secondary py-3">
-                                    Back
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="flex-1 btn-primary py-3 disabled:opacity-50"
+                                    className="flex-1 btn-primary py-3 font-bold disabled:opacity-50"
                                 >
                                     {loading ? 'Creating Account...' : 'Complete Registration'}
                                 </button>
@@ -430,7 +387,7 @@ export default function RegisterPage() {
                             <div className="pt-6">
                                 <Link
                                     href="/login"
-                                    className="w-full btn-primary px-8 py-3 inline-block font-bold text-lg shadow-m hover:shadow-lg transition duration-200"
+                                    className="w-full btn-primary px-8 py-3 inline-block font-bold text-lg shadow-md hover:shadow-lg transition duration-200"
                                 >
                                     Go to Login
                                 </Link>

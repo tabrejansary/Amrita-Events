@@ -80,16 +80,19 @@ exports.getEventRegistrations = async (req, res) => {
             });
         }
 
-        // Privacy check: 
-        // 1. Any Admin can see registrations for "Admin" (Special) events.
-        // 2. Clubs can ONLY see registrations for events they personally created.
-        const isAdminViewingSpecialEvent = req.user.role === 'admin' && (event.organizerName === 'Admin' || (event.organizer && event.organizer.role === 'admin'));
-        const isOwner = event.organizer.toString() === req.user.id;
+        // Privacy check:
+        // 1. Any Admin can see all event registrations.
+        // 2. Club members can see registrations for events created by their own club.
+        //    (event.organizer is now a Club ObjectId after the Club refactor)
+        const isAdmin = req.user.role === 'admin';
+        const userClubId = req.user.club?._id?.toString() || req.user.club?.toString();
+        const eventOrganizerId = event.organizer?.toString();
+        const isClubOwner = userClubId && eventOrganizerId && eventOrganizerId === userClubId;
 
-        if (!isOwner && !isAdminViewingSpecialEvent) {
+        if (!isAdmin && !isClubOwner) {
             return res.status(403).json({
                 success: false,
-                message: 'Not authorized to view registrations for this event. Admin can only view special event registrations.'
+                message: 'Not authorized to view registrations for this event.'
             });
         }
 

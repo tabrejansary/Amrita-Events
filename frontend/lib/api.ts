@@ -105,6 +105,19 @@ export const clubAPI = {
     getMyEvents: (params?: any) => api.get('/api/club/events', { params }),
     getClubStats: (params?: any) => api.get('/api/club/stats', { params }),
     getEventAnalytics: (eventId: string) => api.get(`/api/club/analytics/${eventId}`),
+    // Club Management endpoints
+    getMyClub: () => api.get('/api/clubs/me'),
+    createClub: (formData: FormData) => api.post('/api/clubs/create', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    joinClub: (data: { inviteCode: string }) => api.post('/api/clubs/join', data),
+    updateClub: (formData: FormData) => api.put('/api/clubs/me', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    leaveClub: () => api.post('/api/clubs/me/leave'),
+    removeMember: (userId: string) => api.delete(`/api/clubs/me/members/${userId}`),
+    regenerateInviteCode: () => api.post('/api/clubs/me/invite/regenerate'),
+    sendInviteEmail: (email: string) => api.post('/api/clubs/me/invite/email', { email }),
 };
 
 // Form APIs

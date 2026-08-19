@@ -62,7 +62,11 @@ export default function EventDetailPage() {
         }
     };
 
-    const isRegistered = user?.registeredEvents?.includes(event?._id);
+    const isRegistered = Boolean(
+        event?.isRegistered ||
+        (user?.registeredEvents && Array.isArray(user.registeredEvents) &&
+            user.registeredEvents.some((id: any) => (id?._id || id)?.toString() === event?._id?.toString()))
+    );
 
     const handleVisitLink = async () => {
         if (!event.registrationLink) {

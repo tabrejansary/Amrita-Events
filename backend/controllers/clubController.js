@@ -6,7 +6,14 @@ const Event = require('../models/Event');
 // @access  Private (Club only)
 exports.getMyEvents = async (req, res) => {
     try {
-        const clubId = req.user.id;
+        if (!req.user.club) {
+            return res.status(400).json({
+                success: false,
+                message: 'You are not part of any club. Create or join a club first.',
+            });
+        }
+
+        const clubId = req.user.club; // Club._id, shared by all members
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
@@ -92,7 +99,14 @@ exports.getMyEvents = async (req, res) => {
 // @access  Private (Club owner)
 exports.getClubStats = async (req, res) => {
     try {
-        const clubId = new mongoose.Types.ObjectId(req.user.id);
+        if (!req.user.club) {
+            return res.status(400).json({
+                success: false,
+                message: 'You are not part of any club.',
+            });
+        }
+
+        const clubId = new mongoose.Types.ObjectId(req.user.club);
         const { range, status } = req.query;
         const now = new Date();
 
@@ -191,8 +205,10 @@ exports.getEventAnalytics = async (req, res) => {
             });
         }
 
-        // Check ownership
-        if (event.organizer.toString() !== req.user.id && req.user.role !== 'admin') {
+        // Check ownership — any member of the club can view analytics
+        const userClubId = req.user.club?._id?.toString() || req.user.club?.toString();
+        const isClubMember = userClubId && event.organizer?.toString() === userClubId;
+        if (!isClubMember && req.user.role !== 'admin') {
             return res.status(403).json({
                 success: false,
                 message: 'Not authorized to view analytics for this event',

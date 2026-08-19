@@ -1,10 +1,25 @@
 const Event = require('../models/Event');
 const User = require('../models/User');
+const Club = require('../models/Club');
 const cloudinary = require('../config/cloudinary');
 const fs = require('fs');
 
 // Memory cache to prevent double-counting views within a short window (e.g., 10s)
 const recentViews = new Map();
+
+// Helper to attach isRegistered and isBookmarked to event objects based on the logged-in user
+const formatEventsWithUserStatus = (events, user) => {
+    if (!user) return events;
+    const registeredSet = new Set((user.registeredEvents || []).map(id => (id?._id || id)?.toString()));
+    const savedSet = new Set((user.savedEvents || []).map(id => (id?._id || id)?.toString()));
+
+    return events.map(evt => {
+        const obj = evt.toObject ? evt.toObject() : { ...evt };
+        obj.isRegistered = registeredSet.has(obj._id.toString());
+        obj.isBookmarked = savedSet.has(obj._id.toString());
+        return obj;
+    });
+};
 
 // @desc    Get all approved events (filtered by user interests for students)
 // @route   GET /api/events
@@ -44,7 +59,8 @@ exports.getEvents = async (req, res) => {
         // Sort: Featured first, then by date
         const events = await Event.find(query)
             .sort({ isFeatured: -1, eventDate: 1 })
-            .populate('organizer', 'name email clubName')
+            .populate('organizer', 'name logo')
+            .populate('postedBy', 'name email')
             .populate('customForm')
             .skip(skip)
             .limit(limit);
@@ -58,7 +74,7 @@ exports.getEvents = async (req, res) => {
                 total,
                 pages: Math.ceil(total / limit)
             },
-            data: events,
+            data: formatEventsWithUserStatus(events, req.user),
         });
     } catch (error) {
         res.status(500).json({
@@ -96,7 +112,8 @@ exports.getUpcomingEvents = async (req, res) => {
 
         const events = await Event.find(query)
             .sort({ eventDate: 1 })
-            .populate('organizer', 'name email clubName')
+            .populate('organizer', 'name logo description')
+            .populate('postedBy', 'name email')
             .populate('customForm')
             .skip(skip)
             .limit(limit);
@@ -110,7 +127,7 @@ exports.getUpcomingEvents = async (req, res) => {
                 total,
                 pages: Math.ceil(total / limit)
             },
-            data: events,
+            data: formatEventsWithUserStatus(events, req.user),
         });
     } catch (error) {
         res.status(500).json({
@@ -152,7 +169,8 @@ exports.getThisWeekEvents = async (req, res) => {
 
         const events = await Event.find(query)
             .sort({ eventDate: 1 })
-            .populate('organizer', 'name email clubName')
+            .populate('organizer', 'name logo description')
+            .populate('postedBy', 'name email')
             .skip(skip)
             .limit(limit);
 
@@ -165,7 +183,7 @@ exports.getThisWeekEvents = async (req, res) => {
                 total,
                 pages: Math.ceil(total / limit)
             },
-            data: events,
+            data: formatEventsWithUserStatus(events, req.user),
         });
     } catch (error) {
         res.status(500).json({
@@ -194,7 +212,8 @@ exports.getFeaturedEvents = async (req, res) => {
 
         const events = await Event.find(query)
             .sort({ eventDate: 1 })
-            .populate('organizer', 'name email clubName')
+            .populate('organizer', 'name logo description')
+            .populate('postedBy', 'name email')
             .skip(skip)
             .limit(limit);
 
@@ -207,7 +226,7 @@ exports.getFeaturedEvents = async (req, res) => {
                 total,
                 pages: Math.ceil(total / limit)
             },
-            data: events,
+            data: formatEventsWithUserStatus(events, req.user),
         });
     } catch (error) {
         res.status(500).json({
@@ -242,7 +261,8 @@ exports.getGeneralEvents = async (req, res) => {
 
         const events = await Event.find(query)
             .sort({ eventDate: 1 })
-            .populate('organizer', 'name email clubName')
+            .populate('organizer', 'name logo description')
+            .populate('postedBy', 'name email')
             .skip(skip)
             .limit(limit);
 
@@ -255,7 +275,7 @@ exports.getGeneralEvents = async (req, res) => {
                 total,
                 pages: Math.ceil(total / limit)
             },
-            data: events,
+            data: formatEventsWithUserStatus(events, req.user),
         });
     } catch (error) {
         res.status(500).json({
@@ -285,7 +305,8 @@ exports.getTrendingEvents = async (req, res) => {
             .sort({ bookmarksCount: -1, views: -1 })
             .skip(skip)
             .limit(limit)
-            .populate('organizer', 'name email clubName');
+            .populate('organizer', 'name logo description')
+            .populate('postedBy', 'name email');
 
         res.status(200).json({
             success: true,
@@ -296,7 +317,7 @@ exports.getTrendingEvents = async (req, res) => {
                 total,
                 pages: Math.ceil(total / limit)
             },
-            data: events,
+            data: formatEventsWithUserStatus(events, req.user),
         });
     } catch (error) {
         res.status(500).json({
@@ -316,15 +337,24 @@ exports.getSavedEvents = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const user = await User.findById(req.user.id);
+        const savedIds = (user.savedEvents || []).map(id => id.toString());
 
-        const total = user.savedEvents.length;
+        let query = {
+            _id: { $in: savedIds },
+            status: { $in: ['approved', 'completed'] }
+        };
 
-        const events = await Event.find({
-            _id: { $in: user.savedEvents },
-            status: 'approved'
-        })
+        // Apply filters
+        if (req.query.category) query.category = req.query.category;
+        if (req.query.department && req.query.department !== 'All') query.department = req.query.department;
+        if (req.query.isOnline !== undefined) query.isOnline = req.query.isOnline === 'true';
+
+        const total = await Event.countDocuments(query);
+
+        const events = await Event.find(query)
             .sort({ eventDate: 1 })
-            .populate('organizer', 'name email clubName')
+            .populate('organizer', 'name logo description')
+            .populate('postedBy', 'name email')
             .skip(skip)
             .limit(limit);
 
@@ -337,7 +367,7 @@ exports.getSavedEvents = async (req, res) => {
                 total,
                 pages: Math.ceil(total / limit)
             },
-            data: events,
+            data: formatEventsWithUserStatus(events, req.user),
         });
     } catch (error) {
         res.status(500).json({
@@ -357,15 +387,24 @@ exports.getRegisteredEvents = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const user = await User.findById(req.user.id);
+        const registeredIds = (user.registeredEvents || []).map(id => id.toString());
 
-        const total = user.registeredEvents.length;
+        let query = {
+            _id: { $in: registeredIds },
+            status: { $in: ['approved', 'completed'] }
+        };
 
-        const events = await Event.find({
-            _id: { $in: user.registeredEvents },
-            status: 'approved'
-        })
+        // Apply filters
+        if (req.query.category) query.category = req.query.category;
+        if (req.query.department && req.query.department !== 'All') query.department = req.query.department;
+        if (req.query.isOnline !== undefined) query.isOnline = req.query.isOnline === 'true';
+
+        const total = await Event.countDocuments(query);
+
+        const events = await Event.find(query)
             .sort({ eventDate: 1 })
-            .populate('organizer', 'name email clubName')
+            .populate('organizer', 'name logo description')
+            .populate('postedBy', 'name email')
             .skip(skip)
             .limit(limit);
 
@@ -378,7 +417,7 @@ exports.getRegisteredEvents = async (req, res) => {
                 total,
                 pages: Math.ceil(total / limit)
             },
-            data: events,
+            data: formatEventsWithUserStatus(events, req.user),
         });
     } catch (error) {
         res.status(500).json({
@@ -416,7 +455,8 @@ exports.getPastEvents = async (req, res) => {
 
         const events = await Event.find(query)
             .sort({ eventDate: -1 })
-            .populate('organizer', 'name email clubName')
+            .populate('organizer', 'name logo description')
+            .populate('postedBy', 'name email')
             .skip(skip)
             .limit(limit);
 
@@ -429,7 +469,7 @@ exports.getPastEvents = async (req, res) => {
                 total,
                 pages: Math.ceil(total / limit)
             },
-            data: events,
+            data: formatEventsWithUserStatus(events, req.user),
         });
     } catch (error) {
         res.status(500).json({
@@ -494,7 +534,8 @@ exports.toggleBookmark = async (req, res) => {
 exports.getEvent = async (req, res) => {
     try {
         const event = await Event.findById(req.params.id)
-            .populate('organizer', 'name email clubName')
+            .populate('organizer', 'name logo description')
+            .populate('postedBy', 'name email')
             .populate('customForm');
 
         if (!event) {
@@ -504,9 +545,10 @@ exports.getEvent = async (req, res) => {
             });
         }
 
-        // Increment view count ONLY if user is NOT the organizer and NOT an admin
+        // Increment view count ONLY if user is NOT the organizer/club member and NOT an admin
         // AND handle the "double increment" issue by checking if this request is a duplicate within 10s
-        const isOrganizer = event.organizer && req.user.id === event.organizer._id.toString();
+        const isOrganizer = (event.postedBy && req.user.id === event.postedBy._id.toString()) ||
+            (req.user.club && event.organizer && req.user.club.toString() === event.organizer._id.toString());
         const isAdmin = req.user.role === 'admin';
         const viewKey = `${req.user.id}:${req.params.id}`;
         const now = Date.now();
@@ -525,9 +567,17 @@ exports.getEvent = async (req, res) => {
             }
         }
 
+        const eventData = event.toObject ? event.toObject() : { ...event };
+        if (req.user) {
+            const registeredSet = new Set((req.user.registeredEvents || []).map(id => (id?._id || id)?.toString()));
+            const savedSet = new Set((req.user.savedEvents || []).map(id => (id?._id || id)?.toString()));
+            eventData.isRegistered = registeredSet.has(event._id.toString());
+            eventData.isBookmarked = savedSet.has(event._id.toString());
+        }
+
         res.status(200).json({
             success: true,
-            data: event,
+            data: eventData,
         });
     } catch (error) {
         res.status(500).json({
@@ -569,6 +619,28 @@ exports.createEvent = async (req, res) => {
             parsedContacts = contacts;
         }
 
+        // For club users: require they belong to a club
+        if (req.user.role === 'club') {
+            if (!req.user.club) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'You must create or join a club before posting events.',
+                });
+            }
+        }
+
+        // Fetch club name for organizerName
+        let organizerName = 'Admin';
+        let organizerId = req.user.id; // fallback for admin
+        if (req.user.role === 'club') {
+            const club = await Club.findById(req.user.club);
+            if (!club) {
+                return res.status(404).json({ success: false, message: 'Club not found.' });
+            }
+            organizerName = club.name;
+            organizerId = club._id;
+        }
+
         // Create event object
         const eventData = {
             title,
@@ -580,8 +652,9 @@ exports.createEvent = async (req, res) => {
             eventTime,
             registrationLink,
             isOnline: isOnline || false,
-            organizer: req.user.id,
-            organizerName: req.user.role === 'admin' ? 'Admin' : (req.user.clubName || req.user.name),
+            organizer: organizerId,
+            postedBy: req.user.id,
+            organizerName,
             status: req.user.role === 'admin' ? 'approved' : 'pending',
             contacts: parsedContacts,
             useInternalRegistration: useInternalRegistration === 'true' || useInternalRegistration === true,
@@ -656,13 +729,16 @@ exports.updateEvent = async (req, res) => {
         }
 
         // Check ownership & permissions
-        const isOwner = event.organizer.toString() === req.user.id;
-        const isAdminEditingSpecialEvent = req.user.role === 'admin' && event.organizerName === 'Admin';
+        // event.organizer is a Club ObjectId (after Club refactor)
+        // Any member of the same club can edit/delete club events; admins can edit any event
+        const userClubId = req.user.club?._id?.toString() || req.user.club?.toString();
+        const isClubOwner = userClubId && event.organizer?.toString() === userClubId;
+        const isAdmin = req.user.role === 'admin';
 
-        if (!isOwner && !isAdminEditingSpecialEvent) {
+        if (!isClubOwner && !isAdmin) {
             return res.status(403).json({
                 success: false,
-                message: 'Not authorized to update this event. Only the original organizer can edit this.',
+                message: 'Not authorized to update this event.',
             });
         }
 
@@ -735,7 +811,7 @@ exports.updateEvent = async (req, res) => {
         event = await Event.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true,
-        }).populate('organizer', 'name email clubName').populate('customForm');
+        }).populate('organizer', 'name logo description').populate('postedBy', 'name email').populate('customForm');
 
         res.status(200).json({
             success: true,
@@ -764,13 +840,16 @@ exports.deleteEvent = async (req, res) => {
         }
 
         // Check ownership & permissions
-        const isOwner = event.organizer.toString() === req.user.id;
-        const isAdminEditingSpecialEvent = req.user.role === 'admin' && event.organizerName === 'Admin';
+        // event.organizer is a Club ObjectId (after Club refactor)
+        // Any member of the same club can delete club events; admins can delete any event
+        const userClubId = req.user.club?._id?.toString() || req.user.club?.toString();
+        const isClubOwner = userClubId && event.organizer?.toString() === userClubId;
+        const isAdmin = req.user.role === 'admin';
 
-        if (!isOwner && !isAdminEditingSpecialEvent) {
+        if (!isClubOwner && !isAdmin) {
             return res.status(403).json({
                 success: false,
-                message: 'Not authorized to delete this event. Only the original organizer can delete this.',
+                message: 'Not authorized to delete this event.',
             });
         }
 

@@ -252,7 +252,7 @@ exports.getEventPerformance = async (req, res) => {
 
         // Get events with sorting
         const events = await Event.find(query)
-            .populate('organizer', 'name clubName role')
+            .populate('organizer', 'name logo description')
             .sort({ [sortBy]: sortOrder })
             .skip(skip)
             .limit(limit)
@@ -262,7 +262,7 @@ exports.getEventPerformance = async (req, res) => {
         const eventsWithMetrics = events.map(event => ({
             ...event,
             conversionRate: event.views > 0 ? ((event.registrations / event.views) * 100).toFixed(2) : 0,
-            organizerName: event.organizer?.role === 'admin' ? 'Admin' : (event.organizer?.clubName || event.organizer?.name || event.organizerName)
+            organizerName: event.organizer?.name || event.organizerName || 'Club Event'
         }));
 
         res.status(200).json({
@@ -409,7 +409,7 @@ exports.getTopPerformers = async (req, res) => {
         const topByRegistrations = await Event.find({ status: 'approved' })
             .sort({ registrations: -1 })
             .limit(5)
-            .populate('organizer', 'name clubName')
+            .populate('organizer', 'name logo description')
             .lean();
 
         // Top 5 by conversion rate (where views > 10 to avoid outliers)
@@ -417,7 +417,7 @@ exports.getTopPerformers = async (req, res) => {
             status: 'approved',
             views: { $gte: 10 }
         })
-            .populate('organizer', 'name clubName')
+            .populate('organizer', 'name logo description')
             .lean();
 
         const eventsWithConversion = allEvents.map(event => ({
@@ -442,7 +442,7 @@ exports.getTopPerformers = async (req, res) => {
         })
             .sort({ views: 1 })
             .limit(5)
-            .populate('organizer', 'name clubName')
+            .populate('organizer', 'name logo description')
             .lean();
 
         res.status(200).json({
@@ -450,19 +450,19 @@ exports.getTopPerformers = async (req, res) => {
             data: {
                 topByRegistrations: topByRegistrations.map(e => ({
                     ...e,
-                    organizerName: e.organizer?.role === 'admin' ? 'Admin' : (e.organizer?.clubName || e.organizer?.name || e.organizerName)
+                    organizerName: e.organizer?.name || e.organizerName || 'Club Event'
                 })),
                 topByConversion: eventsWithConversion.map(e => ({
                     ...e,
-                    organizerName: e.organizer?.role === 'admin' ? 'Admin' : (e.organizer?.clubName || e.organizer?.name || e.organizerName)
+                    organizerName: e.organizer?.name || e.organizerName || 'Club Event'
                 })),
                 lowConversion: lowPerformers.map(e => ({
                     ...e,
-                    organizerName: e.organizer?.role === 'admin' ? 'Admin' : (e.organizer?.clubName || e.organizer?.name || e.organizerName)
+                    organizerName: e.organizer?.name || e.organizerName || 'Club Event'
                 })),
                 lowEngagement: lowEngagement.map(e => ({
                     ...e,
-                    organizerName: e.organizer?.role === 'admin' ? 'Admin' : (e.organizer?.clubName || e.organizer?.name || e.organizerName)
+                    organizerName: e.organizer?.name || e.organizerName || 'Club Event'
                 }))
             }
         });

@@ -22,8 +22,8 @@ exports.protect = async (req, res, next) => {
         // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // Get user from token (excluding password)
-        req.user = await User.findById(decoded.id);
+        // Get user from token — populate club so req.user.club is the Club ObjectId
+        req.user = await User.findById(decoded.id).populate('club', '_id name logo');
 
         if (!req.user) {
             return res.status(401).json({

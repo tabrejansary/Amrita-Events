@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/common/Navbar';
 import Footer from '@/components/common/Footer';
-import { eventAPI, formAPI } from '@/lib/api';
+import { eventAPI, formAPI, authAPI } from '@/lib/api';
 import { CATEGORIES, DEPARTMENTS } from '@/lib/constants';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { FaSpinner, FaSave, FaArrowLeft, FaWpforms } from 'react-icons/fa';
@@ -43,14 +43,22 @@ export default function EditEventPage() {
     });
 
     useEffect(() => {
-        const userData = localStorage.getItem('user');
-        if (!userData) {
+        const token = localStorage.getItem('token');
+        if (!token) {
             router.push('/login');
             return;
         }
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-        fetchEventData(parsedUser);
+        // Always fetch fresh user data so club field is populated
+        authAPI.getMe()
+            .then(res => {
+                const freshUser = res.data.data;
+                localStorage.setItem('user', JSON.stringify(freshUser));
+                setUser(freshUser);
+                fetchEventData(freshUser);
+            })
+            .catch(() => {
+                router.push('/login');
+            });
         fetchTemplates();
     }, [params.id]);
 
@@ -78,19 +86,21 @@ export default function EditEventPage() {
             const response = await eventAPI.getEvent(params.id as string);
             const event = response.data.data;
 
-            // Security check: 
-            // 1. Any Admin can edit "Admin" (Special) events.
-            // 2. Clubs can ONLY edit events they personally created.
-            const isAdminEditingSpecialEvent = currentUser.role === 'admin' && event.organizerName === 'Admin';
+            // Security check:
+            // After Club refactor: event.organizer is a Club ObjectId.
+            // Any member of the same club can edit club events; admins can edit any event.
+            const isAdmin = currentUser.role === 'admin';
 
-            let organizerId = null;
+            let organizerId: string | null = null;
             if (event.organizer) {
                 organizerId = typeof event.organizer === 'object' ? event.organizer._id : event.organizer;
             }
 
-            const isOwner = organizerId === currentUser._id;
+            // Get the user's club id (handles both raw id string and populated object)
+            const userClubId = currentUser.club?._id || currentUser.club || null;
+            const isClubOwner = userClubId && organizerId && organizerId.toString() === userClubId.toString();
 
-            if (!isOwner && !isAdminEditingSpecialEvent) {
+            if (!isClubOwner && !isAdmin) {
                 alert('You are not authorized to edit this event.');
                 router.push(`/events/${event._id}`);
                 return;

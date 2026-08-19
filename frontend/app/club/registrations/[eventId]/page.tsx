@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/common/Navbar';
 import Footer from '@/components/common/Footer';
-import { registrationAPI, eventAPI, formAPI } from '@/lib/api';
+import { registrationAPI, eventAPI, formAPI, authAPI } from '@/lib/api';
 import { FaDownload, FaSearch, FaFilter, FaArrowLeft, FaSpinner } from 'react-icons/fa';
 
 export default function RegistrationDetailsPage() {
@@ -20,14 +20,10 @@ export default function RegistrationDetailsPage() {
     const [userRole, setUserRole] = useState<'student' | 'club' | 'admin' | null>(null);
 
     useEffect(() => {
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            try {
-                const user = JSON.parse(userData);
-                setUserRole(user.role);
-            } catch (e) {
-                console.error('Failed to parse user data');
-            }
+        const token = localStorage.getItem('token');
+        if (!token) {
+            router.push('/login');
+            return;
         }
         fetchData();
     }, [params.eventId]);
@@ -35,12 +31,17 @@ export default function RegistrationDetailsPage() {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const userData = localStorage.getItem('user');
-            if (!userData) {
+            const token = localStorage.getItem('token');
+            if (!token) {
                 router.push('/login');
                 return;
             }
-            const user = JSON.parse(userData);
+
+            // Always fetch fresh user so club field is populated (not stale localStorage)
+            const meRes = await authAPI.getMe();
+            const user = meRes.data.data;
+            localStorage.setItem('user', JSON.stringify(user));
+            setUserRole(user.role);
 
             const [eventRes, regRes] = await Promise.all([
                 eventAPI.getEvent(params.eventId as string),
@@ -49,20 +50,20 @@ export default function RegistrationDetailsPage() {
 
             const eventData = eventRes.data.data;
 
-            // SECURITY CHECK: 
-            // 1. Any Admin can see registrations for "Admin" (Special) events.
-            // 2. Clubs can ONLY see registrations for events they personally created.
-            const isAdminViewingSpecialEvent = user.role === 'admin' && (eventData.organizerName?.toLowerCase() === 'admin');
+            // SECURITY CHECK:
+            // After Club refactor: event.organizer is a Club ObjectId.
+            // Any member of the same club can view registrations; admins can view any.
+            const isAdmin = user.role === 'admin';
 
             const organizerId = eventData.organizer
                 ? (typeof eventData.organizer === 'object' ? (eventData.organizer._id || eventData.organizer.id) : eventData.organizer)
                 : null;
 
-            const isOwner = (user._id === organizerId || user.id === organizerId);
+            const userClubId = user.club?._id || user.club || null;
+            const isClubOwner = userClubId && organizerId && userClubId.toString() === organizerId.toString();
 
-            if (!isOwner && !isAdminViewingSpecialEvent) {
+            if (!isClubOwner && !isAdmin) {
                 console.error('Unauthorized access attempt to registration details');
-                // Redirect based on role
                 if (user.role === 'admin') router.push('/admin/events');
                 else if (user.role === 'club') router.push('/club/events');
                 else router.push('/student/feed');

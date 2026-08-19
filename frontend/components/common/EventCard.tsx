@@ -40,16 +40,23 @@ export default function EventCard({ event, showAnalytics = false, isBookmarked: 
 
     useEffect(() => {
         setIsBookmarked(initialBookmarked);
-        setIsRegistered(event.isRegistered || false);
 
         const userData = localStorage.getItem('user');
+        let userRegistered = false;
         if (userData) {
-            const user = JSON.parse(userData);
-            setUserRole(user.role);
-            if (user.registeredEvents && user.registeredEvents.includes(event._id)) {
-                setIsRegistered(true);
+            try {
+                const user = JSON.parse(userData);
+                setUserRole(user.role);
+                if (user.registeredEvents && Array.isArray(user.registeredEvents)) {
+                    userRegistered = user.registeredEvents.some(
+                        (id: any) => (id?._id || id)?.toString() === event._id?.toString()
+                    );
+                }
+            } catch (e) {
+                console.error(e);
             }
         }
+        setIsRegistered(Boolean(event.isRegistered || userRegistered));
     }, [initialBookmarked, event.isRegistered, event._id]);
 
     const handleBookmarkToggle = async (e: React.MouseEvent) => {
@@ -73,7 +80,13 @@ export default function EventCard({ event, showAnalytics = false, isBookmarked: 
     return (
         <Link href={`/events/${event._id}`}>
             <div className="card hover:shadow-md transition cursor-pointer relative group !p-2.5">
-                {event.isFeatured && (
+                {userRole === 'student' && isRegistered && (
+                    <div className="absolute top-0 right-0 bg-emerald-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-bl-lg z-10 shadow-sm flex items-center space-x-1 tracking-wider uppercase">
+                        <FaCheckSquare size={9} />
+                        <span>Registered</span>
+                    </div>
+                )}
+                {event.isFeatured && (!isRegistered || userRole !== 'student') && (
                     <div className="absolute top-0 right-0 bg-amrita-yellow text-amrita-maroon text-[9px] font-bold px-2 py-0.5 rounded-bl-lg z-10 shadow-sm">
                         FEATURED
                     </div>
@@ -116,7 +129,7 @@ export default function EventCard({ event, showAnalytics = false, isBookmarked: 
                 <div className="space-y-1.5">
                     <div className="flex items-start justify-between gap-2">
                         <h3 className="text-sm font-bold text-amrita-textDark line-clamp-1 group-hover:text-amrita-maroon transition-colors">{event.title}</h3>
-                        <span className="bg-amrita-maroon/5 text-amrita-maroon text-[9px] font-bold px-2 py-0.5 rounded whitespace-nowrap uppercase tracking-wider">
+                        <span className="bg-amrita-maroon/5 text-amrita-maroon text-[9px] font-bold px-2 py-0.5 rounded whitespace-nowrap uppercase tracking-wider flex-shrink-0">
                             {event.category}
                         </span>
                     </div>

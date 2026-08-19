@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/common/Navbar';
 import EventCard from '@/components/common/EventCard';
+import RegisteredEventCard from '@/components/student/RegisteredEventCard';
 import Footer from '@/components/common/Footer';
 import AnnouncementBanner from '@/components/common/AnnouncementBanner';
-import { eventAPI } from '@/lib/api';
+import { eventAPI, authAPI } from '@/lib/api';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import Pagination from '@/components/common/Pagination';
 import { FaFilter, FaSpinner, FaCalendarAlt, FaClock, FaStar, FaGlobeAmericas, FaBookmark, FaHistory, FaCheckSquare } from 'react-icons/fa';
@@ -56,6 +57,15 @@ export default function StudentFeedPage() {
             return;
         }
         setUser(parsedUser);
+
+        // Fetch fresh user data to ensure registeredEvents list is always up-to-date
+        authAPI.getMe()
+            .then(res => {
+                const freshUser = res.data.data;
+                localStorage.setItem('user', JSON.stringify(freshUser));
+                setUser(freshUser);
+            })
+            .catch(() => {});
 
         // Load initial section and saved event IDs (for bookmark status)
         fetchSavedEventIds();
@@ -323,17 +333,30 @@ export default function StudentFeedPage() {
                             Showing {events.length} of {pagination.total} event{pagination.total !== 1 ? 's' : ''}
                         </div>
 
-                        <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                            {events.map(event => (
-                                <EventCard
-                                    key={event._id}
-                                    event={event}
-                                    isBookmarked={savedEventIds.includes(event._id)}
-                                    onBookmarkChange={handleBookmarkChange}
-                                    onRegisterChange={handleRegisterChange}
-                                />
-                            ))}
-                        </div>
+                        {activeSection === 'registered' ? (
+                            <div className="space-y-4">
+                                {events.map(event => (
+                                    <RegisteredEventCard
+                                        key={event._id}
+                                        event={event}
+                                        isBookmarked={savedEventIds.includes(event._id)}
+                                        onBookmarkChange={handleBookmarkChange}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                {events.map(event => (
+                                    <EventCard
+                                        key={event._id}
+                                        event={event}
+                                        isBookmarked={savedEventIds.includes(event._id)}
+                                        onBookmarkChange={handleBookmarkChange}
+                                        onRegisterChange={handleRegisterChange}
+                                    />
+                                ))}
+                            </div>
+                        )}
 
                         <Pagination
                             currentPage={pagination.page}

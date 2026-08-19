@@ -111,10 +111,24 @@ export default function AdminAllEventsPage() {
 
     const handleToggleFeature = async (eventId: string, currentStatus: boolean) => {
         try {
+            const newStatus = !currentStatus;
             await adminAPI.toggleFeature(eventId);
-            setEvents(events.map(e =>
-                e._id === eventId ? { ...e, isFeatured: !currentStatus } : e
+
+            // Update main events list
+            setEvents(prev => prev.map(e =>
+                e._id === eventId ? { ...e, isFeatured: newStatus } : e
             ));
+
+            // Also update selectedOrganizer events if viewing a club
+            setSelectedOrganizer((prev: any) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    events: (prev.events || []).map((e: any) =>
+                        e._id === eventId ? { ...e, isFeatured: newStatus } : e
+                    )
+                };
+            });
         } catch (error) {
             alert('Failed to update featured status');
         }
@@ -125,7 +139,18 @@ export default function AdminAllEventsPage() {
 
         try {
             await eventAPI.deleteEvent(eventId);
-            setEvents(events.filter(e => e._id !== eventId));
+            setEvents(prev => prev.filter(e => e._id !== eventId));
+
+            // Also update selectedOrganizer if viewing a club
+            setSelectedOrganizer((prev: any) => {
+                if (!prev) return prev;
+                const newEvents = (prev.events || []).filter((e: any) => e._id !== eventId);
+                return {
+                    ...prev,
+                    eventCount: Math.max(0, newEvents.length),
+                    events: newEvents
+                };
+            });
             alert('Event deleted successfully');
         } catch (error) {
             alert('Failed to delete event');
@@ -155,44 +180,60 @@ export default function AdminAllEventsPage() {
         e.isFeatured && e.status !== 'completed'
     );
 
-    // Process Organizers (Combining registered clubs and organizers from events)
+    // Process Organizers (Strictly Clubs from database + any active club events)
     const organizersMap = new Map();
 
-    // 1. Add all registered clubs (even if they have no events)
+    // 1. Add all registered clubs from the database
     clubs.forEach(club => {
-        if (club.role !== 'admin' && club.name?.toLowerCase() !== 'admin') {
-            const id = club._id || club.id;
+        const id = (club._id || club.id)?.toString();
+        if (id) {
             organizersMap.set(id, {
                 ...club,
-                eventCount: 0,
+                _id: id,
+                name: club.name || club.clubName || 'Unknown Club',
+                clubName: club.name || club.clubName || 'Unknown Club',
+                clubLogo: club.logo || club.clubLogo,
+                role: 'club',
+                eventCount: club.eventCount || 0,
                 events: []
             });
         }
     });
 
-    // 2. Add/Update organizers from actual events
+    // 2. Attach events to their corresponding club
     filteredEvents.forEach(e => {
         const isSpecialEvent = e.organizer?.role === 'admin' || e.organizerName?.toLowerCase() === 'admin';
         if (!isSpecialEvent) {
-            // Try to find a unique ID for this organizer
-            const orgId = typeof e.organizer === 'object' ? (e.organizer?._id || e.organizer?.id) : e.organizer;
-            const id = orgId || e.organizerName; // Fallback to name if no ID
+            const orgId = (typeof e.organizer === 'object' ? (e.organizer?._id || e.organizer?.id) : e.organizer)?.toString();
 
-            if (organizersMap.has(id)) {
-                const org = organizersMap.get(id);
-                org.eventCount += 1;
+            if (orgId && organizersMap.has(orgId)) {
+                const org = organizersMap.get(orgId);
                 org.events.push(e);
-                // If the registered club was added but didn't have name (unlikely), update it
-                if (!org.name && e.organizerName) org.name = e.organizerName;
-            } else {
-                organizersMap.set(id, {
-                    _id: id,
-                    name: e.organizerName,
-                    clubName: e.organizerName,
-                    role: 'club',
-                    eventCount: 1,
-                    events: [e]
-                });
+                if (org.events.length > org.eventCount) {
+                    org.eventCount = org.events.length;
+                }
+            } else if (e.organizer?.name || e.organizerName) {
+                const clubName = e.organizer?.name || e.organizerName;
+                let matched = false;
+                for (const org of organizersMap.values()) {
+                    if (org.name?.toLowerCase() === clubName.toLowerCase()) {
+                        org.events.push(e);
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    const id = orgId || clubName;
+                    organizersMap.set(id, {
+                        _id: id,
+                        name: clubName,
+                        clubName: clubName,
+                        clubLogo: e.organizer?.logo,
+                        role: 'club',
+                        eventCount: 1,
+                        events: [e]
+                    });
+                }
             }
         }
     });
@@ -555,6 +596,8 @@ export default function AdminAllEventsPage() {
 
 // Sub-component to clean up the main page code
 function AdminEventItem({ event, currentUserId, handleToggleFeature, handleDelete }: any) {
+    const isFeatured = Boolean(event.isFeatured);
+
     return (
         <div className="relative group">
             <EventCard event={event} />
@@ -563,14 +606,20 @@ function AdminEventItem({ event, currentUserId, handleToggleFeature, handleDelet
                 {event.status !== 'completed' && (
                     <>
                         <button
-                            onClick={() => handleToggleFeature(event._id, event.isFeatured)}
-                            className={`flex-1 min-w-[80px] px-3 py-1.5 rounded-md transition flex items-center justify-center space-x-1.5 border ${event.isFeatured
+                            type="button"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleToggleFeature(event._id, isFeatured);
+                            }}
+                            className={`flex-1 min-w-[80px] px-3 py-1.5 rounded-md transition flex items-center justify-center space-x-1.5 border cursor-pointer shadow-sm ${isFeatured
                                 ? 'bg-amrita-yellow border-amrita-yellow text-amrita-maroon font-bold'
-                                : 'border-gray-200 text-amrita-textGray hover:border-amrita-yellow text-[11px]'
+                                : 'border-gray-300 text-gray-700 bg-white hover:border-amrita-yellow hover:text-amrita-maroon text-[11px] font-semibold'
                                 }`}
+                            title={isFeatured ? 'Click to unfeature' : 'Click to feature on homepage'}
                         >
-                            <FaStar size={12} className={event.isFeatured ? 'text-amrita-maroon' : ''} />
-                            <span className="text-[11px]">{event.isFeatured ? 'Featured' : 'Feature'}</span>
+                            <FaStar size={12} className={isFeatured ? 'text-amrita-maroon' : 'text-gray-400'} />
+                            <span className="text-[11px]">{isFeatured ? 'Featured ★' : 'Feature'}</span>
                         </button>
 
                         {((event.organizer && currentUserId === (typeof event.organizer === 'object' ? event.organizer._id : event.organizer)) || event.organizerName === 'Admin') && (
@@ -586,8 +635,13 @@ function AdminEventItem({ event, currentUserId, handleToggleFeature, handleDelet
                 )}
 
                 <button
-                    onClick={() => handleDelete(event._id)}
-                    className="px-3 py-1 bg-red-50 text-red-600 border border-red-100 rounded-md hover:bg-red-600 hover:text-white transition flex items-center justify-center flex-1 min-w-[80px] font-bold"
+                    type="button"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDelete(event._id);
+                    }}
+                    className="px-3 py-1 bg-red-50 text-red-600 border border-red-100 rounded-md hover:bg-red-600 hover:text-white transition flex items-center justify-center flex-1 min-w-[80px] font-bold cursor-pointer"
                     title="Delete Event"
                 >
                     <FaTrash size={12} className="mr-1.5" />

@@ -144,11 +144,13 @@ export default function Navbar({ role }: NavbarProps) {
                         <div className="hidden sm:flex items-center space-x-2 border-l border-white/20 pl-4 py-1">
                             <div className="text-right">
                                 <p className="text-[10px] md:text-xs font-bold text-amrita-yellow uppercase tracking-wider">{role || 'User'}</p>
-                                <p className="text-xs md:text-sm font-medium line-clamp-1 max-w-[100px]">{user?.name || user?.clubName || 'Profile'}</p>
+                                <p className="text-xs md:text-sm font-medium line-clamp-1 max-w-[140px]" title={role === 'club' ? (user?.club?.name || user?.name) : user?.name}>
+                                    {role === 'club' ? (user?.club?.name || user?.name || 'Club') : (user?.name || 'Profile')}
+                                </p>
                             </div>
-                            {(user?.profileImage || user?.clubLogo) ? (
+                            {((role === 'club' && user?.club?.logo) || user?.profileImage) ? (
                                 <img
-                                    src={user.profileImage || user.clubLogo}
+                                    src={(role === 'club' && user?.club?.logo) || user?.profileImage}
                                     alt="Profile"
                                     className="w-8 h-8 rounded-full object-cover border border-white/30"
                                 />
@@ -186,12 +188,14 @@ export default function Navbar({ role }: NavbarProps) {
                         {/* Mobile Profile Link */}
                         <div className="flex items-center space-x-4 p-3 bg-amrita-bgLight rounded-xl">
                             <div className="w-12 h-12 rounded-full bg-amrita-maroon/10 flex items-center justify-center overflow-hidden">
-                                {(user?.profileImage || user?.clubLogo) ? (
-                                    <img src={user.profileImage || user.clubLogo} alt="Profile" className="w-full h-full object-cover" />
+                                {(user?.profileImage || (role === 'club' && user?.club?.logo)) ? (
+                                    <img src={user.profileImage || user.club?.logo} alt="Profile" className="w-full h-full object-cover" />
                                 ) : <FaUser className="text-amrita-maroon" />}
                             </div>
                             <div>
-                                <p className="text-lg font-bold text-amrita-textDark">{user?.name || user?.clubName || 'My Profile'}</p>
+                                <p className="text-lg font-bold text-amrita-textDark">
+                                    {role === 'club' ? (user?.club?.name || user?.name || 'Club') : (user?.name || 'My Profile')}
+                                </p>
                                 <p className="text-xs font-medium text-amrita-textGray uppercase">{role || 'User'}</p>
                             </div>
                         </div>

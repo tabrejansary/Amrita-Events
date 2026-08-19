@@ -10,10 +10,16 @@ const EventSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please provide an event description'],
     },
+    // The club that owns this event
     organizer: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Club',
         required: true,
+    },
+    // The individual club member who posted the event
+    postedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
     },
     organizerName: {
         type: String,

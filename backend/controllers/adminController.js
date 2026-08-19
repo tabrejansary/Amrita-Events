@@ -1,6 +1,7 @@
 const Event = require('../models/Event');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const Club = require('../models/Club');
 const sendEmail = require('../utils/sendEmail');
 const crypto = require('crypto');
 
@@ -17,7 +18,8 @@ exports.getPendingEvents = async (req, res) => {
 
         const events = await Event.find({ status: 'pending' })
             .sort({ createdAt: -1 })
-            .populate('organizer', 'name email clubName role')
+            .populate('organizer', 'name logo description')
+            .populate('postedBy', 'name email role')
             .populate('customForm')
             .skip(skip)
             .limit(limit);
@@ -140,20 +142,26 @@ exports.toggleFeature = async (req, res) => {
 
         // If featuring, notify relevant students
         if (event.isFeatured) {
-            const students = await User.find({
-                role: 'student',
-                interests: event.category,
-            });
+            try {
+                const students = await User.find({
+                    role: 'student',
+                    interests: event.category,
+                });
 
-            const notifications = students.map(student => ({
-                user: student._id,
-                event: event._id,
-                type: 'featured',
-                title: 'Featured Event',
-                message: `"${event.title}" has been featured! Check it out.`,
-            }));
+                if (students.length > 0) {
+                    const notifications = students.map(student => ({
+                        user: student._id,
+                        event: event._id,
+                        type: 'featured',
+                        title: 'Featured Event',
+                        message: `"${event.title}" has been featured! Check it out.`,
+                    }));
 
-            await Notification.insertMany(notifications);
+                    await Notification.insertMany(notifications);
+                }
+            } catch (notifErr) {
+                console.error('Feature notification error (non-fatal):', notifErr);
+            }
         }
 
         res.status(200).json({
@@ -580,7 +588,8 @@ exports.getAllEvents = async (req, res) => {
 
         const events = await Event.find(query)
             .sort({ createdAt: -1 })
-            .populate('organizer', 'name email clubName role')
+            .populate('organizer', 'name logo description')
+            .populate('postedBy', 'name email role')
             .populate('customForm')
             .skip(skip)
             .limit(limit);
@@ -728,26 +737,41 @@ exports.getAdmins = async (req, res) => {
 exports.getAllClubs = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
+        const limit = parseInt(req.query.limit) || 100;
         const skip = (page - 1) * limit;
 
-        const total = await User.countDocuments({ role: 'club' });
+        const total = await Club.countDocuments();
 
-        const clubs = await User.find({ role: 'club' })
-            .select('-password')
+        const clubs = await Club.find()
+            .populate('owner', 'name email')
+            .populate('members.user', 'name email')
+            .sort({ name: 1 })
             .skip(skip)
             .limit(limit);
 
+        // Compute exact event counts for each club
+        const clubsWithStats = await Promise.all(
+            clubs.map(async (club) => {
+                const eventCount = await Event.countDocuments({ organizer: club._id });
+                const clubObj = club.toObject();
+                clubObj.eventCount = eventCount;
+                clubObj.clubName = club.name;
+                clubObj.clubLogo = club.logo;
+                clubObj.role = 'club';
+                return clubObj;
+            })
+        );
+
         res.status(200).json({
             success: true,
-            count: clubs.length,
+            count: clubsWithStats.length,
             pagination: {
                 page,
                 limit,
                 total,
                 pages: Math.ceil(total / limit)
             },
-            data: clubs,
+            data: clubsWithStats,
         });
     } catch (error) {
         res.status(500).json({
